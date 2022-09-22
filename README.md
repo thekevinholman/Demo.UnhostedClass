@@ -2,7 +2,7 @@
 
 ## [Download Here][Download]
 
-[Download]: https://github.com/thekevinholman/SCOM.Management/archive/master.zip
+[Download]: https://github.com/thekevinholman/Demo.UnhostedClass/archive/refs/heads/main.zip
 
 
 SCOM - Management Pack to create a SCOM Class unhosted by Windows Computer with special HealthServiceShouldManageEntity relationship
