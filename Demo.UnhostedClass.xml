@@ -1,0 +1,235 @@
+<ManagementPack ContentReadable="true" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <Manifest>
+    <Identity>
+      <ID>Demo.UnhostedClass</ID>
+      <Version>1.0.0.10</Version>
+    </Identity>
+    <Name>Demo.UnhostedClass</Name>
+    <References>
+      <Reference Alias="SCDW">
+        <ID>Microsoft.SystemCenter.DataWarehouse.Library</ID>
+        <Version>6.1.7221.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="SC">
+        <ID>Microsoft.SystemCenter.Library</ID>
+        <Version>6.1.7221.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="Windows">
+        <ID>Microsoft.Windows.Library</ID>
+        <Version>6.1.7221.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="Health">
+        <ID>System.Health.Library</ID>
+        <Version>6.1.7221.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="System">
+        <ID>System.Library</ID>
+        <Version>6.1.7221.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="Performance">
+        <ID>System.Performance.Library</ID>
+        <Version>6.1.7221.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+    </References>
+  </Manifest>
+  <TypeDefinitions>
+    <EntityTypes>
+      <ClassTypes>
+        <ClassType ID="Demo.UnhostedClass.Class" Accessibility="Internal" Abstract="false" Base="Windows!Microsoft.Windows.ApplicationComponent" Hosted="false" Singleton="false">
+          <Property ID="KeyProperty" Type="string" Key="true" CaseSensitive="false" Length="256" MinLength="0" />
+        </ClassType>
+      </ClassTypes>
+    </EntityTypes>
+  </TypeDefinitions>
+  <Monitoring>
+    <Discoveries>
+      <Discovery ID="Demo.UnhostedClass.Class.Discovery" Enabled="true" Target="Windows!Microsoft.Windows.Server.OperatingSystem" ConfirmDelivery="false" Remotable="true" Priority="Normal">
+        <Category>Discovery</Category>
+        <DiscoveryTypes>
+          <DiscoveryClass TypeID="Demo.UnhostedClass.Class" />
+        </DiscoveryTypes>
+        <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.TimedScript.DiscoveryProvider">
+          <IntervalSeconds>86400</IntervalSeconds>
+          <SyncTime />
+          <ScriptName>Demo.UnhostedClass.Class.Discovery.vbs</ScriptName>
+          <Arguments>$MPElement$ $Target/Id$ $Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/PrincipalName$</Arguments>
+          <ScriptBody><![CDATA['==================================================================================
+' Script: 	Demo.UnhostedClass.Class.Discovery.vbs
+' Date:	1/19/14	
+' Author: 	mpauthor@microsoft.com
+' Purpose:	Discovers unhosted Demo.UnhostedClass class
+'		Creates a HealthServiceShouldManageEntity relationship between the local agent and the 
+'			newly created Demo.UnhostedClass object to cause the object to
+'			be managed on the local agent instead of the Management Servers.
+'==================================================================================
+
+'Setup variables sent in through script arguments
+SourceId = WScript.Arguments(0) 		'GUID of discovery calling the script.  Provided by the MPElement variable.
+ManagedEntityId = WScript.Arguments(1)	'GUID of target object.  Provided by the Target/Id variable.
+sComputerName = WScript.Arguments(2)	'Name of the computer holding the Store Server or Store Client class.
+
+'Start by setting up API object and creating a discovery data object.
+'Discovery data object requires the MPElement and Target/ID variables.  The first argument in the method is always 0.
+Set oAPI = CreateObject("MOM.ScriptAPI")
+Set oDiscoveryData = oAPI.CreateDiscoveryData(0, SourceId, ManagedEntityId)
+
+	'===== Log that the script is running for troubleshooting
+	Call oAPI.LogScriptEvent("Demo.UnhostedClass.Class.Discovery.vbs", 123, 0, "Running discovery script")
+
+
+	'===== Create the instance
+	'Create an instance of the class and add it to the discovery data.
+	'The KeyProperty property is required because it is the key property of the class.
+	Set oUnhostedInstance = oDiscoveryData.CreateClassInstance("$MPElement[Name='Demo.UnhostedClass.Class']$")
+	oUnhostedInstance.AddProperty "$MPElement[Name='Demo.UnhostedClass.Class']/KeyProperty$", sComputerName
+	oDiscoveryData.AddInstance(oUnhostedInstance)
+	
+	'===== Force object to be managed on agent
+	'By default, unhosted objects are managed on the Management Servers.
+	'To manage the object on an agent instead, create an instance of the HealthServiceShouldManageEntity relationship.
+	'Source of the relationship is the health service of the agent. Target of the relationship is the object itself.
+
+	'Create an instance of the health service class.
+	Set oHealthServiceInstance = oDiscoveryData.CreateClassInstance("$MPElement[Name='SC!Microsoft.SystemCenter.HealthService']$")
+	oHealthServiceInstance.AddProperty "$MPElement[Name='Windows!Microsoft.Windows.Computer']/PrincipalName$", sComputerName 
+	oDiscoveryData.AddInstance oHealthServiceInstance
+	
+	'Create the relationship and add to the discovery data.
+	set oShouldManageInstance = oDiscoveryData.CreateRelationshipInstance("$MPElement[Name='SC!Microsoft.SystemCenter.HealthServiceShouldManageEntity']$")
+	oShouldManageInstance.Source = oHealthServiceInstance
+	oShouldManageInstance.Target = oUnhostedInstance
+	oDiscoveryData.AddInstance oShouldManageInstance
+
+'Return the discovery data.
+oAPI.Return(oDiscoveryData)
+
+'Sample GUID for testing from the command line
+'{286671bf-40d1-133e-e623-68fe42a3c091}
+]]></ScriptBody>
+          <TimeoutSeconds>60</TimeoutSeconds>
+        </DataSource>
+      </Discovery>
+    </Discoveries>
+    <Rules>
+      <Rule ID="Demo.UnhostedClass.AlertOn100.Rule" Enabled="true" Target="Demo.UnhostedClass.Class" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <ComputerName>.</ComputerName>
+            <LogName>Application</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">100</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">TEST</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>1</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Demo.UnhostedClass.AlertOn100.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression />
+            <Custom1 />
+            <Custom2 />
+            <Custom3 />
+            <Custom4 />
+            <Custom5 />
+            <Custom6 />
+            <Custom7 />
+            <Custom8 />
+            <Custom9 />
+            <Custom10 />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Demo.UnhostedClass.CollectPerf.Rule" Enabled="true" Target="Demo.UnhostedClass.Class" ConfirmDelivery="false" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>PerformanceCollection</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Performance!System.Performance.OptimizedDataProvider">
+            <ComputerName>.</ComputerName>
+            <CounterName>Avg. Disk Queue Length</CounterName>
+            <ObjectName>LogicalDisk</ObjectName>
+            <InstanceName>C:</InstanceName>
+            <AllInstances>false</AllInstances>
+            <Frequency>300</Frequency>
+            <Tolerance>0</Tolerance>
+            <ToleranceType>Absolute</ToleranceType>
+            <MaximumSampleSeparation>1</MaximumSampleSeparation>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="WriteToDB" TypeID="SC!Microsoft.SystemCenter.CollectPerformanceData" />
+          <WriteAction ID="WriteToDW" TypeID="SCDW!Microsoft.SystemCenter.DataWarehouse.PublishPerformanceData" />
+        </WriteActions>
+      </Rule>
+    </Rules>
+  </Monitoring>
+  <Presentation>
+    <StringResources>
+      <StringResource ID="Demo.UnhostedClass.AlertOn100.Rule.AlertMessage" />
+    </StringResources>
+  </Presentation>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="Demo.UnhostedClass">
+          <Name>Demo Unhosted Class Example</Name>
+          <Description />
+        </DisplayString>
+        <DisplayString ElementID="Demo.UnhostedClass.AlertOn100.Rule">
+          <Name>Demo Alert on Event 100 Rule</Name>
+        </DisplayString>
+        <DisplayString ElementID="Demo.UnhostedClass.AlertOn100.Rule.AlertMessage">
+          <Name>Alert from unhosted classs</Name>
+          <Description>Event Description: {0}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Demo.UnhostedClass.CollectPerf.Rule">
+          <Name>Demo Collect Perf Unhosted Class Rule</Name>
+        </DisplayString>
+        <DisplayString ElementID="Demo.UnhostedClass.Class">
+          <Name>Demo Unhosted Class</Name>
+        </DisplayString>
+        <DisplayString ElementID="Demo.UnhostedClass.Class" SubElementID="KeyProperty">
+          <Name>KeyProperty</Name>
+        </DisplayString>
+        <DisplayString ElementID="Demo.UnhostedClass.Class.Discovery">
+          <Name>Demo Unhosted Class Discovery</Name>
+        </DisplayString>
+      </DisplayStrings>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPack>
